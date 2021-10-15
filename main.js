@@ -1,36 +1,60 @@
 // Modules to control application life and create native browser window
-const {app, BrowserWindow} = require('electron')
+const {app, BrowserWindow, session, ipcMain } = require('electron')
 const path = require('path')
+const partition = 'persist:serviceworker-partition';
 
-function createWindow () {
+function createWindow (preloadScript) {
   // Create the browser window.
   const mainWindow = new BrowserWindow({
     width: 800,
     height: 600,
+    show: false,
     webPreferences: {
       nodeIntegrationInWorker: true,
-      preload: path.join(__dirname, 'preload.js')
+      preload: path.join(__dirname, preloadScript),
+      partition: partition
     }
   })
 
   // and load the index.html of the app.
   mainWindow.loadFile('index.html')
 
-  // Open the DevTools.
-  mainWindow.webContents.openDevTools()
+  return mainWindow;
 }
 
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
 app.whenReady().then(() => {
-  createWindow()
-  
-  app.on('activate', function () {
-    // On macOS it's common to re-create a window in the app when the
-    // dock icon is clicked and there are no other windows open.
-    if (BrowserWindow.getAllWindows().length === 0) createWindow()
-  })
+  const command = app.commandLine.getSwitchValue('command');
+  if (command === 'cleanup') {
+    console.info('* * * cleaning up...');
+    session.fromPartition(partition)
+      .clearStorageData({storages: ['serviceworkers']})
+      .then(() => {
+        console.info('* * * cleaning up...done');
+        app.quit();
+      });
+  } else if (command === 'install-sw') {
+    console.info('* * * installing service worker...');
+    ipcMain.on('IPC_SW_INSTALLED', (e, arg) => {
+      console.info('* * * installing service worker...done');
+      app.quit();
+    });
+    ipcMain.on('IPC_SW_FAILED', (e, arg) => {
+      console.info('* * * installing service worker...failed');
+      app.quit();
+    });
+    createWindow('preload-install.js');
+  } else {
+    const mainWindow = createWindow('preload.js');
+    mainWindow.webContents.on('crashed', () =>
+      console.info('* * * renderer process is crashed...'));
+    mainWindow.once('ready-to-show', () => {
+      mainWindow.show();
+      mainWindow.webContents.openDevTools();
+    });
+  }
 })
 
 // Quit when all windows are closed, except on macOS. There, it's common

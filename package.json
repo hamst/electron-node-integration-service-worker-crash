@@ -4,7 +4,9 @@
   "description": "A minimal Electron application",
   "main": "main.js",
   "scripts": {
-    "start": "electron ."
+    "start": "electron . --enable-logging=stderr",
+    "cleanup": "electron . --command=cleanup --enable-logging=stderr",
+    "install-sw": "electron . --command=install-sw --enable-logging=stderr"
   },
   "repository": "https://github.com/electron/electron-quick-start",
   "keywords": [
@@ -17,6 +19,6 @@
   "author": "GitHub",
   "license": "CC0-1.0",
   "devDependencies": {
-    "electron": "^9.1.1"
+    "electron": "^15.1.2"
   }
 }
